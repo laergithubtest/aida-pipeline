@@ -1,0 +1,135 @@
+version: "3.6"
+
+services:
+  knowledge-volume-mounter:
+     image: laerinternal.com/knowledge
+     volumes:
+         - type: volume
+           source: knowledge
+           target: /knowledge
+           read_only: false
+
+  input-volume-mounter:
+     image: laerinternal.com/{{case}}-sample
+#     image: {{case}}
+     volumes:
+         - type: volume
+           source: {{case}}
+           target: /{{case}}
+           read_only: false
+
+  config-volume-mounter:
+     image: laerinternal.com/{{case}}-config:0.1
+     volumes:
+         - type: volume
+           source: {{case}}-config
+           target: /config
+           read_only: true
+
+  laernlp:
+     build:
+        context: "https://$gitusername:$gitpassword@github.com/laergithubtest/LaerNLP.git#v2018.12.21.0"
+        args:
+           - maven
+
+  mongo:
+     container_name: mongo 
+     image: laerinternal.com/mongo:0.1
+     volumes:
+        - mongo-data:/data/db
+
+  solr:
+     image: solr
+     volumes:
+         - type: volume
+           source: solr-data
+           target: /opt/solr/server/solr
+
+  aida-pipeline:
+     container_name: aida-pipeline
+     build:
+        context: .
+        args:
+            - gitusername
+            - gitpassword
+            - maven
+            - mongo_db_key
+            - google_api_key
+            - google_knowledge_key
+            - bing_search_key
+            - pipl_key
+            - clearbit_key
+     depends_on:
+         - knowledge-volume-mounter
+         - input-volume-mounter
+         - config-volume-mounter
+         - laernlp
+         - mongo
+         - solr
+     volumes:
+#         - /home/laer/data/corpus/enron/out-enron:/out-enron
+
+         - type: volume
+           source: knowledge
+           target: /knowledge
+           read_only: false
+
+         - type: volume
+           source: out-{{case}}
+           target: /out-{{case}}
+           read_only: false
+
+         - type: volume
+           source: {{case}}
+           target: /{{case}}
+           read_only: false
+
+         - type: volume
+           source: {{case}}-config
+           target: /config
+           read_only: true
+
+     environment:
+         - LAERNLP_URI=http://laernlp:9000
+         - COMMON_KB_FOLDER=/knowledge
+         - MONGODB_IP=mongo
+         - MONGODB_PORT=27017
+         - SOLR_IP=solr
+         - SOLR_PORT=8983
+         - WAIT_HOSTS=laernlp:9000,mongo:27017,solr:8983
+         - WAIT_HOSTS_TIMEOUT=180
+     command: sh -c "/wait"
+#     command: sh -c "/wait
+#                    && cd /root/aida-raw-data-loader && python run.py --config /config/config-{{case}}.json --custodians /config/custodians-{{case}}.json
+#                    && cd /root/aida-kb && python run.py --case_path /out-{{case}}
+#                    && cd /root/aida-pdf-ocr && python run.py --case_path /out-{{case}}
+#                    && cd /root/aida-document-parsing && python run.py --case_path /out-{{case}}
+#                    && cd /root/aida-mongo && python run.py --case_path /out-{{case}}
+#                    && cd /root/search-indexer && ./build.sh {{case}}"
+#     command: sh -c "/wait
+#                    && cd /root/search-indexer && ./build.sh {{case}}"
+
+volumes:
+  knowledge:
+    name: knowledge
+    external: false
+
+  {{case}}-config:
+    name: {{case}}-config
+    external: false
+
+  {{case}}:
+    name: {{case}}
+    external: false
+
+  out-{{case}}:
+    name: out-{{case}}
+    external: false
+
+  mongo-data:
+    name: mongo-data
+    external: false 
+
+  solr-data:
+    name: solr-data
+    external: false
